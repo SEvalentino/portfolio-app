@@ -33,7 +33,7 @@ pipeline {
           script {
             def scannerHome = tool 'sonar-scanner'  // pastikan tool ini ada di Global Tool Configuration
             sh """
-              set -euxo pipefail
+              set -eu
               "${scannerHome}/bin/sonar-scanner"
             """
           }
