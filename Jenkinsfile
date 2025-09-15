@@ -45,7 +45,7 @@ pipeline {
       steps {
         withCredentials([file(credentialsId: 'gcp-sa-jenkins', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
           sh """
-            set -euxo pipefail
+            set -eu
             gcloud auth activate-service-account --key-file="\$GOOGLE_APPLICATION_CREDENTIALS"
             gcloud auth configure-docker ${REGION}-docker.pkg.dev -q
 
@@ -63,7 +63,7 @@ pipeline {
       steps {
         withCredentials([file(credentialsId: 'gcp-sa-jenkins', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
           sh """
-            set -euxo pipefail
+            set -eu
             export USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
             gcloud auth activate-service-account --key-file="\$GOOGLE_APPLICATION_CREDENTIALS"
