@@ -10,7 +10,7 @@ pipeline {
     CLUSTER      = 'portfolio-cluster'
     ZONE         = 'asia-southeast1-a'
     K8S_NAMESPACE= 'portfolio'
-    SONARQUBE_ENV= 'sonarqube'
+    SONARQUBE_ENV= 'sonarqube'                 // harus match di Manage Jenkins → System → SonarQube servers
     USE_GKE_GCLOUD_AUTH_PLUGIN = 'True'
   }
 
@@ -20,15 +20,18 @@ pipeline {
   }
 
   stages {
+
     stage('Checkout') {
-      steps { checkout scm }
+      steps {
+        checkout scm
+      }
     }
 
     stage('SonarQube Analysis') {
       steps {
         withSonarQubeEnv("${SONARQUBE_ENV}") {
           script {
-            def scannerHome = tool 'sonar-scanner'
+            def scannerHome = tool 'sonar-scanner'  // pastikan tool ini ada di Global Tool Configuration
             sh """
               set -eu
               "${scannerHome}/bin/sonar-scanner"
@@ -47,7 +50,6 @@ pipeline {
             gcloud auth configure-docker ${REGION}-docker.pkg.dev -q
 
             TAG=\$(date +%Y%m%d-%H%M%S)
-            docker info >/dev/null
             docker build -t ${IMAGE_URI}:\$TAG -t ${IMAGE_URI}:latest .
             docker push ${IMAGE_URI}:\$TAG
             docker push ${IMAGE_URI}:latest
@@ -57,27 +59,24 @@ pipeline {
       }
     }
 
-    stage('Deploy to GKE (Helm)') {
+    stage('Deploy to GKE') {
       steps {
         withCredentials([file(credentialsId: 'gcp-sa-jenkins', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
           sh """
             set -eu
             export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
             gcloud auth activate-service-account --key-file="\$GOOGLE_APPLICATION_CREDENTIALS"
             gcloud container clusters get-credentials ${CLUSTER} --zone ${ZONE} --project ${PROJECT_ID}
 
-            # pastikan helm tersedia
-            helm version
+            kubectl get ns ${K8S_NAMESPACE} >/dev/null 2>&1 || kubectl create ns ${K8S_NAMESPACE}
+
+            kubectl apply -n ${K8S_NAMESPACE} -f k8s/deployment.yaml
+            kubectl apply -n ${K8S_NAMESPACE} -f k8s/service.yaml
 
             TAG=\$(cat .image_tag)
-            helm upgrade --install portfolio-app ./portfolio-chart \
-              --namespace ${K8S_NAMESPACE} \
-              --create-namespace \
-              --set image.repository=${IMAGE_URI} \
-              --set image.tag=\$TAG \
-              --set replicaCount=2
-
-            kubectl -n ${K8S_NAMESPACE} rollout status deployment/portfolio-app --timeout=120s
+            kubectl -n ${K8S_NAMESPACE} set image deployment/portfolio-app portfolio=${IMAGE_URI}:\$TAG
+            kubectl -n ${K8S_NAMESPACE} rollout status deployment/portfolio-app --timeout=180s
           """
         }
       }
