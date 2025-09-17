@@ -70,7 +70,7 @@ pipeline {
             helm version
 
             TAG=\$(cat .image_tag)
-            helm upgrade --install portfolio-app ./portfolio-chart \
+            helm upgrade --install portfolio-app ~/portfolio-project/portfolio-chart \
               --namespace ${K8S_NAMESPACE} \
               --create-namespace \
               --set image.repository=${IMAGE_URI} \
