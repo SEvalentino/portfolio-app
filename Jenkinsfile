@@ -27,13 +27,23 @@ pipeline {
     stage('SonarQube Analysis') {
       steps {
         withSonarQubeEnv("${SONARQUBE_ENV}") {
-          script {
-            def scannerHome = tool 'sonar-scanner'
-            sh """
-              set -eu
-              "${scannerHome}/bin/sonar-scanner"
-            """
+          withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+            script {
+              def scannerHome = tool 'sonar-scanner'
+              sh """
+                set -eu
+                "${scannerHome}/bin/sonar-scanner" \
+                  -Dsonar.token=${SONAR_TOKEN}
+              """
+            }  
           }
+        }
+      }
+    }
+    stage('Quality Gate') {
+      steps {
+        timeout(time: 2, unit: 'MINUTES') {
+          waitForQualityGate abortPipeline: true
         }
       }
     }
